@@ -8,7 +8,7 @@ From iris.heap_lang Require Import lang notation spawn par.
 
 (**
   HeapLang is an untyped concurrent programming language with a heap. It
-  is an ML-like language, sporting many of the usual constructs such as
+  is an ML-like language, supporting many of the usual constructs such as
   let expressions, lambda abstractions, and recursive functions. It also
   supports higher-order functions. The evaluation order is right to left
   and it is a call-by-value language.
