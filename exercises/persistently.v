@@ -88,8 +88,9 @@ Qed.
 
 Lemma pers_dup (P : iProp Σ) `{!Persistent P} : P ⊢ P ∗ P.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros "#P".
+  by iSplit.
+Qed.
 
 (**
   Persistent propositions satisfy a lot of nice properties simply by
@@ -140,7 +141,7 @@ Proof.
   - iIntros "HP".
     (**
       Iris already knows that [□] is idempotent, so it automatically
-      removes all persistently modalities from a proposition when adding
+      removes all persistent modalities from a proposition when adding
       it to the persistent context. One may think of all propositions in
       the persistent context as having an implicit [□] in front.
     *)
@@ -173,8 +174,9 @@ Proof.
       ["#"].
     *)
     iFrame "#".
-  - (* exercise *)
-Admitted.
+  - iIntros "#[P Q]".
+    iSplit; by iModIntro.
+Qed.
 
 (** Persistency is preserved by quantifications. *)
 
@@ -329,8 +331,15 @@ Lemma counter_spec (inc : val) :
     counter inc
   {{{ v, RET v; ⌜v = #2⌝ }}}.
 Proof.
-  (* exercise *)
-Admitted.
+  rewrite /counter.
+  iIntros (Φ) "#inc_spec H".
+  wp_alloc l as "Hl".
+  wp_pures.
+  do 2 ( wp_apply ("inc_spec" with "[Hl]"); try (by iFrame);
+         simpl; iIntros (v) "Hl"; wp_seq; clear v ).
+  wp_load.
+  by iApply "H".
+Qed.
 
 (* ----------------------------------------------------------------- *)
 (** *** Persistent Points-to *)
@@ -471,7 +480,14 @@ Proof.
   rewrite /par_read.
   (** Both threads have the same postcondition, [t_post]. *)
   set t_post := (λ v, (⌜v = #21⌝)%I : iProp Σ).
-  (* exercise *)
-Admitted.
+  wp_alloc l as "[Hl1 Hl2]".
+  wp_pures.
+  wp_apply (wp_par t_post t_post with "[Hl1] [Hl2]").
+  1,2:wp_load; by wp_pures.
+  iIntros (r1 r2) "[-> ->]".
+  iNext.
+  wp_pures.
+  by iApply "HΦ".
+Qed.
 
 End persistently.
