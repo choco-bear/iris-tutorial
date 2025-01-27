@@ -158,8 +158,11 @@ Example lambda : expr :=
 Lemma lambda_spec : ⊢ WP lambda {{ v, ⌜v = #20⌝ }}.
 Proof.
   rewrite /lambda.
-  (* exercise *)
-Admitted.
+  wp_pures.
+  iModIntro.
+  iPureIntro.
+  reflexivity.
+Qed.
 
 (* ================================================================= *)
 (** ** Resources *)
@@ -297,8 +300,13 @@ Proof.
   wp_cmpxchg_fail.
   wp_proj.
   wp_if.
-  (* exercise *)
-Admitted.
+  wp_load.
+  wp_pures.
+  wp_cmpxchg_suc.
+  wp_pures.
+  wp_load.
+  by wp_pures.
+Qed.
 
 (**
   We finish this section with a final remark about the points-to
@@ -636,5 +644,21 @@ Definition race_spec (l : loc) (v : val) :=
   Could we prove this specification similarly to how we proved
   [par_client]?
 *)
+Goal forall l v, race_spec l v.
+Proof.
+  rewrite /race_spec /race.
+  iIntros (l v Φ) "Hl H".
+  wp_pures.
+  wp_apply (par_spec with "[Hl]").
+  1:instantiate (1:=(λ v : val, (l ↦ #1)%I)).
+  { wp_lam. wp_store. by iFrame. }
+  2:{ iIntros (r1 r2) "[H1 H2]".
+      iNext.
+      iApply "H".
+      iFrame.
+    }
+  wp_lam.
+  (* Cannot use [wp_store]... *)
+  Abort.
 
 End specifications.
