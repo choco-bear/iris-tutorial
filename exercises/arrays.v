@@ -64,7 +64,6 @@ Proof.
       [emp], which in Iris is just a synonym for [True].
     *)
     rewrite !array_nil.
-    iModIntro.
     by iApply "HΦ".
   - wp_rec; wp_pures.
     (**
@@ -133,8 +132,22 @@ Lemma inc_spec a l :
     inc #a #(length l)
   {{{RET #(); a ↦∗ ((λ i : Z, #(i + 1)) <$> l)}}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros (Φ) "Ha HΦ".
+  iLöb as "IH" forall (a l).
+  destruct l as [|a' l].
+  - wp_rec; wp_pures.
+    rewrite !fmap_nil.
+    by iApply "HΦ".
+  - wp_rec; wp_pures.
+    rewrite !fmap_cons !array_cons.
+    iDestruct "Ha" as "[Ha Hl]".
+    wp_load; wp_store; wp_pures.
+    rewrite Nat2Z.inj_succ Z.sub_1_r Z.pred_succ.
+    wp_apply ("IH" with "Hl").
+    iIntros "Ha'".
+    iApply "HΦ".
+    iFrame.
+Qed.
 
 (* ================================================================= *)
 (** ** Reverse *)
@@ -165,7 +178,30 @@ Lemma reverse_spec a l :
     reverse #a #(length l)
   {{{RET #(); a ↦∗ rev l}}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros (Φ) "Ha HΦ".
+  iLöb as "IH" forall (a l).
+  wp_rec; wp_pures.
+  destruct (bool_decide_reflect (length l ≤ 1)%Z) as [H|H].
+  - apply (Nat2Z.inj_le _ 1) in H.
+    destruct l as [|x [|y l]]; wp_pures.
+    1,2:by iApply "HΦ".
+    simpl in *; lia.
+  - apply Z.nle_gt in H.
+    induction l as [|v2 l _] using rev_ind; try done.
+    destruct l as [|v1 l]; try done.
+    clear H. change (v1 :: ?l) with ([v1] ++ l) at 2.
+    rewrite !rev_app_distr app_length Nat2Z.inj_add /=.
+    rewrite !array_cons !array_app !array_singleton.
+    iDestruct "Ha" as "(Hv1 & Hl & Hv2)"; wp_pures.
+    wp_load; wp_pures.
+    rewrite !Nat2Z.inj_succ Z.sub_1_r Z.pred_succ Loc.add_assoc Z.add_1_l.
+    wp_load; wp_store; wp_store; wp_pures.
+    rewrite Z.add_succ_comm Nat2Z.inj_0 Z.add_simpl_r.
+    wp_apply ("IH" with "Hl").
+    iIntros "Hrevl".
+    rewrite Loc.add_assoc Z.add_1_l rev_length.
+    iApply "HΦ".
+    iFrame.
+Qed.
 
 End proofs.
