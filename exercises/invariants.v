@@ -106,6 +106,7 @@ Proof.
   iIntros "Hinv".
   Fail iInv "Hinv" as "HP".
 Abort.
+Locate "WP".
 
 (**
   An example of a goal that has a mask is a weakest precondition. That
@@ -359,8 +360,15 @@ Proof.
     }
     (** ... and finish the proof of the forked thread. *)
     done.
-  - (* exercise *)
-Admitted.
+  - wp_seq.
+    iInv "Hinv" as "(%v & Hl & Hv)".
+    wp_load.
+    iDestruct "Hv" as %Hv.
+    iSplitR "HΦ"; last by iApply "HΦ".
+    repeat iModIntro.
+    iExists _.
+    by iFrame.
+Qed.
 
 End proofs.
 
@@ -401,45 +409,22 @@ Proof.
   rewrite /prog2.
   wp_alloc l as "Hl".
   wp_pures.
-  (** Like before, we allocate the invariant. *)
-  iMod (inv_alloc N _ (prog2_inv l) with "[Hl]") as "#I".
-  { iNext. by iExists 0. }
+  iMod (inv_alloc N _ (prog2_inv l) with "[Hl]") as "#Hinv".
+  { iNext. by iExists _. }
   wp_apply wp_fork.
   - wp_pure.
-    (** We use löb induction to accent the recursive calls. *)
     iLöb as "IH".
-    wp_pures.
-    (**
-      We need to access the contents of the invariant to step through
-      the read of [l] and the store to [l]. However, invariants can only
-      be open for one step, so we are forced to open the invariant twice
-      in succession.
-      First, we open it around the read.
-    *)
-    wp_bind (! _)%E.
-    iInv "I" as "[%i Hl]".
-    wp_load.
-    iModIntro.
-    iSplitL "Hl".
-    { by iExists i. }
-    wp_pures.
-    (**
-      Next, we open it around the store.
-    *)
-    wp_bind (_ <- _)%E.
-    iInv "I" as "[%j Hl]".
-    wp_store.
-    iModIntro.
-    iSplitL "Hl".
-    { by iExists (i + 1)%Z. }
-    do 2 wp_pure.
-    done.
-  - wp_pures.
-    iInv "I" as "[%i Hl]".
-    wp_load.
-    iModIntro.
-    iSplitL "Hl".
-    { by iExists i. }
+    wp_rec.
+    wp_bind (! #l)%E.
+    iInv "Hinv" as "[%i >Hl]"; wp_load; iModIntro.
+    iSplitL; first (iNext; by iExists _).
+    wp_pures; wp_bind (#l <- #(i + 1))%E.
+    iInv "Hinv" as "[% >Hl]"; wp_store; iModIntro.
+    iSplitL; first (iNext; by iExists _).
+    by wp_seq.
+  - wp_seq.
+    iInv "Hinv" as "[%i >Hl]"; wp_load; iModIntro.
+    iSplitL "Hl"; first (iNext; by iExists _).
     by iApply "HΦ".
 Qed.
 
