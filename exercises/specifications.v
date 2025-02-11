@@ -424,7 +424,7 @@ Qed.
   that must hold before running the program – the precondition.
 
   The syntax for Hoare triples is as follows:
-    [{{{ P }}} e {{{ r0 .. rn, RET v; Q v }}}]
+    [{{{ P }}} e {{{ r0 .. rn, RET v; Q }}}]
   - [P]: the precondition that is assumed to hold before the program runs.
   - [e]: the program to run.
   - [r0 .. rn]: optional, forall quantified variables used for abstract
