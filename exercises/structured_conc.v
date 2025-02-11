@@ -166,6 +166,18 @@ Proof.
       Now we need [HΨ] to reestablish the invariant, but we also need it
       for the postcondition. We are stuck... 
     *)
+    unfold handle_inv1 at 2.
+    iSplitL "Hl HΨ".
+    {
+      iNext.
+      iFrame.
+      iRight.
+      iExists w.
+      by iFrame.
+    }
+    wp_match.
+    iModIntro.
+    iApply "HΦ".
 Abort.
 
 (**
@@ -202,6 +214,36 @@ Definition join_handle (h : val) (Ψ : val → iProp Σ) : iProp Σ :=
   Let us now try to prove the specifications again. We start with
   [spawn].
 *)
+
+Lemma spawn_spec' (P : iProp Σ) (Ψ : val → iProp Σ) (f : val) :
+  {{{ P }}} f #() {{{ v, RET v; Ψ v }}} -∗
+  {{{ P }}} spawn f {{{ h, RET h; join_handle h Ψ }}}.
+Proof.
+  iIntros "#Hf %Φ !> P HΦ".
+  wp_lam.
+  wp_alloc l as "Hl".
+  wp_pures.
+  iMod token_alloc as "[%γ Hγ]".
+  iMod (inv_alloc N _ (handle_inv γ l Ψ) with "[Hl]") as "#I".
+  { iNext. iExists _. iFrame. by iLeft. }
+  wp_apply (wp_fork with "[P]").
+  - iNext.
+    wp_apply ("Hf" with "P").
+    iIntros "%v HΨ".
+    wp_pures.
+    iInv "I" as "(%w & Hl & _)".
+    (*unfold handle_inv at 2.*)
+    wp_store.
+    iFrame.
+    repeat iModIntro.
+    iRight.
+    iLeft.
+    by iFrame.
+  - wp_seq.
+    iApply "HΦ".
+    iExists _, _.
+    by iFrame "# ∗".
+Qed.
 
 Lemma spawn_spec (P : iProp Σ) (Ψ : val → iProp Σ) (f : val) :
   {{{ P }}} f #() {{{ v, RET v; Ψ v }}} -∗
@@ -240,6 +282,28 @@ Proof.
     iApply "HΦ".
     iExists γ, l.
     by iFrame "Hγ I".
+Qed.
+
+Lemma join_spec' (Ψ : val → iProp Σ) (h : val) :
+  {{{ join_handle h Ψ }}} join h {{{ v, RET v; Ψ v }}}.
+Proof.
+  iIntros "%Φ (%γ & %l & -> & Hγ & #I) HΦ".
+  iLöb as "IH".
+  wp_rec.
+  wp_bind (! #l)%E.
+  iInv "I" as "(%_ & Hl & [>-> | [(%w & >-> & HΨ) | >Hγ']])";
+    last iPoseProof (token_exclusive with "Hγ Hγ'") as "[]".
+  - wp_load.
+    iModIntro.
+    iSplitL "Hl".
+    { iFrame. by iLeft. }
+    wp_pures.
+    by iApply ("IH" with "Hγ").
+  - wp_load.
+    iModIntro.
+    iSplitL "Hl Hγ"; first iFrame.
+    wp_pures.
+    by iApply "HΦ".
 Qed.
 
 Lemma join_spec (Ψ : val → iProp Σ) (h : val) :
@@ -338,6 +402,27 @@ Context `{!heapGS Σ, !tokenG Σ}.
   It is actually quite straightforward to prove the [par] specification
   as most of the heavy lifting is done by [spawn_spec] and [join_spec].
 *)
+Lemma par_spec' (P1 P2 : iProp Σ) (e1 e2 : expr) (Q1 Q2 : val → iProp Σ) :
+  {{{ P1 }}} e1 {{{ v, RET v; Q1 v }}} -∗
+  {{{ P2 }}} e2 {{{ v, RET v; Q2 v }}} -∗
+  {{{ P1 ∗ P2 }}} (e1 ||| e2)%V {{{ v1 v2, RET (v1, v2); Q1 v1 ∗ Q2 v2 }}}.
+Proof.
+  iIntros "#H1 #H2 %Φ !> [P1 P2] HΦ".
+  wp_lam; wp_pures.
+  wp_apply (spawn_spec with "[] P1").
+  { iIntros "%Φ1 !> P1 HΦ1". wp_pures. iApply ("H1" with "P1 HΦ1"). }
+  iIntros "%h Hh".
+  wp_pures.
+  wp_apply ("H2" with "P2").
+  iIntros "%v2 HQ2".
+  wp_pures.
+  wp_apply (join_spec with "Hh").
+  iIntros "%v1 HQ1".
+  wp_pures.
+  iApply "HΦ".
+  by iFrame.
+Qed.
+
 Lemma par_spec (P1 P2 : iProp Σ) (e1 e2 : expr) (Q1 Q2 : val → iProp Σ) :
   {{{ P1 }}} e1 {{{ v, RET v; Q1 v }}} -∗
   {{{ P2 }}} e2 {{{ v, RET v; Q2 v }}} -∗
@@ -426,33 +511,34 @@ Proof.
   rewrite /parallel_add.
   wp_alloc r as "Hr".
   wp_pures.
-  iMod (inv_alloc N _ (parallel_add_inv r) with "[Hr]") as "#I".
-  {
-    iNext.
-    iExists 0.
-    iFrame.
-  }
+  iMod (inv_alloc N _ (parallel_add_inv r) with "[Hr]") as "#I"; first iFrame.
   (**
     We don't need information back from the threads, so we will simply
     use [λ _, True] as the postconditions. Similarly, we only need the
     invariant to prove the threads, and since this is in the persistent
     context, we let the preconditions be [True].
   *)
-  wp_apply (par_spec (True%I) (True%I) _ _ (λ _, True%I) (λ _, True%I)).
-  - iIntros (Φ') "!> _ HΦ'".
+  wp_apply (par_spec (True%I) (True%I) _ _ (λ _, True%I) (λ _, True%I)); try done.
+  - iIntros "%Ψ !> _ HΨ".
     iInv "I" as "(%n & Hr & >%Hn)".
     wp_faa.
-    iModIntro.
-    iSplitL "Hr".
-    {
-      iModIntro.
-      iExists (n + 2)%Z.
-      iFrame.
-      iPureIntro.
-      by apply Zeven_plus_Zeven.
-    }
-    by iApply "HΦ'".
-  (* exercise *)
-Admitted.
+    iSplitL "Hr"; last by iApply "HΨ".
+    iFrame.
+    iPureIntro.
+    by apply Zeven_plus_Zeven.
+  - iIntros "%Ψ !> _ HΨ".
+    iInv "I" as "(%n & Hr & >%Hn)".
+    wp_faa.
+    iSplitL "Hr"; last by iApply "HΨ".
+    iFrame.
+    iPureIntro.
+    by apply Zeven_plus_Zeven.
+  - iIntros (v1 v2) "_".
+    wp_seq.
+    iInv "I" as "(%n & Hr & >%Hn)".
+    wp_load.
+    iFrame "∗ %".
+    by iApply "HΦ".
+Qed.
 
 End parallel_add.
