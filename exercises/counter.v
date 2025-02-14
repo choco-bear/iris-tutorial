@@ -534,8 +534,22 @@ Qed.
 Lemma read_spec_full (c : val) (γ : gname) (n : nat) :
   {{{ is_counter c γ n 1 }}} read c {{{ RET #n; is_counter c γ n 1 }}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros "%Φ (%l & -> & Hγ & #I) HΦ".
+  wp_lam.
+  iInv "I" as "(%m & Hl & Hγ')".
+  wp_load.
+  iCombine "Hγ' Hγ" gives "%H".
+  iSplitR "HΦ Hγ"; first by iFrame.
+  apply auth_both_valid_discrete in H as [H _].
+  apply Some_included_exclusive in H.
+  - destruct H as [_ H]; simpl in H.
+    apply leibniz_equiv in H; subst.
+    iApply "HΦ".
+    iExists l.
+    by iFrame "∗ #".
+  - apply _.
+  - done.
+Qed.
 
 Lemma incr_spec (c : val) (γ : gname) (n : nat) (q : Qp) :
   {{{ is_counter c γ n q }}}
