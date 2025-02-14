@@ -305,8 +305,29 @@ Lemma par_incr :
     read "c"
   {{{ n, RET #(S n); True }}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros "%Φ _ HΦ".
+  wp_apply mk_counter_spec; try done.
+  iIntros "%c %γ (%m & -> & #Hγ & #I)".
+  wp_pures.
+  wp_bind (par _ _).
+  iAssert (WP (λ: <>, incr #m)%V #() {{ _, is_counter #m γ 1 }})%I as "H".
+  { wp_pures.
+    wp_apply incr_spec; first by iFrame "#".
+    by iIntros "%_ [_ ?]". }
+  remember (fun _ => is_counter #m γ 1) as Ψ.
+  wp_apply (par_spec Ψ Ψ); try done.
+  subst; iIntros "%v1 %v2 [(%l & %e & #Hγ' & _) _]".
+  rewrite /read.
+  iNext; wp_pures.
+  iInv "I" as "(%n & Hl & Hγ'')".
+  wp_load.
+  destruct n as [|n'].
+  - iAssert (⌜1 ≤ 0⌝)%I as "%contra"; last lia.
+    by iApply (state_valid γ 0 1 with "Hγ''").
+  - iModIntro.
+    iFrame.
+    by iApply "HΦ".
+Qed.
 
 End spec1.
 End spec1.
