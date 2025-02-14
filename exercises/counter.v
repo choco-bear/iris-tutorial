@@ -369,6 +369,18 @@ Definition is_counter (v : val) (γ : gname) (n : nat) (q : Qp) : iProp Σ :=
   splitting the fraction, as well as splitting the knowledge of how much
   the counter has been incremented.
 *)
+Lemma is_counter_add' (c : val) (γ : gname) (n m : nat) (p q : Qp) :
+  is_counter c γ (n + m) (p + q) ⊣⊢ is_counter c γ n p ∗ is_counter c γ m q.
+Proof.
+  iSplit.
+  - iIntros "(%l & -> & [Hγ1 Hγ2] & #I)".
+    by iFrame "∗ #".
+  - iIntros "[(%l & -> & Hγ1 & #I) (%l' & %e & Hγ2 & _)]".
+    injection e as <-.
+    iCombine "Hγ1 Hγ2" as "Hγ".
+    by iFrame "∗ #".
+Qed.
+
 Lemma is_counter_add (c : val) (γ : gname) (n m : nat) (p q : Qp) :
   is_counter c γ (n + m) (p + q) ⊣⊢ is_counter c γ n p ∗ is_counter c γ m q.
 Proof.
