@@ -573,8 +573,29 @@ Proof.
     apply (inj Z.of_nat) in e.
     subst m'.
     wp_cmpxchg_suc.
-    (* exercise *)
-Admitted.
+    iCombine "Hγ Hγ'" as "Hγ" gives "%H".
+    rewrite own_op.
+    iPoseProof (update_state _ _ _ _ with "Hγ") as ">[Hγ Hγ']".
+    assert (#(m + 1) = #(S m)) as ->.
+    { rewrite Nat2Z.inj_succ Z.add_1_r; reflexivity. } 
+    iSplitL "Hl Hγ"; first by iFrame.
+    iModIntro.
+    wp_pures.
+    iApply "HΦ".
+    iSplitR.
+    + iPureIntro.
+      apply auth_both_valid_discrete in H as [H _].
+      apply Some_pair_included_r, Some_included in H as [H|H].
+      * apply leibniz_equiv in H; lia.
+      * apply nat_included in H; done.
+    + iExists l.
+      by iFrame "∗ #".
+  - wp_cmpxchg_fail.
+    iSplitL "Hγ Hl"; first by iFrame.
+    iModIntro.
+    wp_pures.
+    by iApply ("IH" with "Hγ'").
+Qed.
 
 End spec2.
 End spec2.
