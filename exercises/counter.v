@@ -496,8 +496,17 @@ Qed.
 Lemma mk_counter_spec :
   {{{ True }}} mk_counter #() {{{ c γ, RET c; is_counter c γ 0 1}}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros "%Φ _ HΦ".
+  wp_lam.
+  wp_alloc l as "Hl".
+  iPoseProof alloc_initial_state as ">[%γ [Hγa Hγf]]".
+  iApply ("HΦ" $! _ γ).
+  iExists l.
+  iFrame.
+  iSplitR; try done.
+  iMod (inv_alloc _ _ _ with "[Hl Hγa]"); last done.
+  iFrame.
+Qed.
 
 Lemma read_spec (c : val) (γ : gname) (n : nat) (q : Qp) :
   {{{ is_counter c γ n q }}}
