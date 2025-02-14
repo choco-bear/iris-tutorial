@@ -119,6 +119,20 @@ Definition is_lock γ v P : iProp Σ :=
   Making a new lock consists of giving away ownership of the resources
   to be protected, [P], to the lock.
 *)
+Lemma mk_lock_spec' P :
+  {{{ P }}} mk_lock #() {{{ γ v, RET v; is_lock γ v P }}}.
+Proof.
+  iIntros "%Φ P HΦ".
+  wp_lam.
+  wp_alloc l as "Hl".
+  iMod locked_alloc as "[%γ Hγ]".
+  iApply ("HΦ" $! γ).
+  iExists l.
+  iMod (inv_alloc _ _ _ with "[P Hl Hγ]") as "#I";
+    last by iFrame "#".
+  by iFrame.
+Qed.
+
 Lemma mk_lock_spec P :
   {{{ P }}} mk_lock #() {{{ γ v, RET v; is_lock γ v P }}}.
 Proof.
@@ -142,6 +156,25 @@ Qed.
   Acquiring the lock should grant access to the protected resources as
   well as knowledge that the lock has been locked.
 *)
+Lemma acquire_spec' γ v P :
+  {{{ is_lock γ v P }}} acquire v {{{ RET #(); locked γ ∗ P }}}.
+Proof.
+  iIntros "%Φ (%l & -> & #I) HΦ".
+  iLöb as "IH".
+  wp_rec.
+  wp_bind (CmpXchg _ _ _).
+  iInv "I" as "(%b & Hl & Hγ)".
+  destruct b.
+  - wp_cmpxchg_fail.
+    iSplitL "Hl"; first by iFrame.
+    iModIntro; wp_pures.
+    by iApply "IH".
+  - wp_cmpxchg_suc.
+    iSplitL "Hl"; first by iFrame.
+    iModIntro; wp_pures.
+    by iApply "HΦ".
+Qed.
+
 Lemma acquire_spec γ v P :
   {{{ is_lock γ v P }}} acquire v {{{ RET #(); locked γ ∗ P }}}.
 Proof.
@@ -180,8 +213,15 @@ Qed.
 Lemma release_spec γ v P :
   {{{ is_lock γ v P ∗ locked γ ∗ P }}} release v {{{ RET #(); True }}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros "%Φ ((%l & -> & #I) & Hγ & P) HΦ".
+  wp_lam.
+  iInv "I" as "(%b & Hl & H)".
+  wp_store.
+  iSplitR "HΦ"; last by iApply "HΦ".
+  iModIntro.
+  iExists false.
+  iFrame.
+Qed.
 
 (* ================================================================= *)
 (** ** Example Client *)
@@ -203,6 +243,29 @@ Definition prog : expr :=
   [x] can take on the values of [0], [1], and [7]. However, we should
   not observe [7], as it is overridden before the lock is released.
 *)
+Lemma prog_spec' : ⊢ WP prog {{ v, ⌜v = #0 ∨ v = #1⌝}}.
+Proof.
+  rewrite /prog.
+  wp_alloc x as "Hx".
+  wp_pures.
+  wp_apply (mk_lock_spec (∃ v, x ↦ v ∗ ⌜v = #0 ∨ v = #1⌝) with "[Hx]");
+    first by (iFrame; iLeft).
+  iIntros "%γ %l #Hl".
+  wp_pures.
+  wp_apply wp_fork.
+  - wp_apply (acquire_spec _ _ _ _ with "Hl").
+    iIntros "[Hγ (%v & Hx & Hv)]".
+    wp_pures.
+    do 2 wp_store.
+    wp_apply (release_spec _ _ _ _ with "[Hγ Hx]"); last done.
+    by (iFrame "# ∗"; iRight).
+  - wp_pures.
+    wp_apply (acquire_spec _ _ _ _ with "Hl").
+    iIntros "[Hγ (%v & Hx & Hv)]".
+    wp_pures.
+    by wp_load.
+Qed.
+
 Lemma prog_spec : ⊢ WP prog {{ v, ⌜v = #0 ∨ v = #1⌝}}.
 Proof.
   rewrite /prog.
