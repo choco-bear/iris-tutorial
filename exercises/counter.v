@@ -513,8 +513,23 @@ Lemma read_spec (c : val) (γ : gname) (n : nat) (q : Qp) :
     read c
   {{{ (u : nat), RET #u; is_counter c γ n q ∗ ⌜n ≤ u⌝ }}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros "%Φ (%l & -> & Hγ & #I) HΦ".
+  wp_lam.
+  iInv "I" as "(%m & Hl & Hγ')".
+  wp_load.
+  iCombine "Hγ' Hγ" gives "%H".
+  iSplitR "HΦ Hγ"; first by iFrame.
+  iApply "HΦ".
+  iModIntro.
+  iSplitL.
+  - iExists l.
+    by iFrame "∗ #".
+  - iPureIntro.
+    apply auth_both_valid_discrete in H as [H _].
+    apply Some_pair_included_r, Some_included in H as [H|H].
+    + apply leibniz_equiv in H; lia.
+    + apply nat_included; done.
+Qed.
 
 Lemma read_spec_full (c : val) (γ : gname) (n : nat) :
   {{{ is_counter c γ n 1 }}} read c {{{ RET #n; is_counter c γ n 1 }}}.
