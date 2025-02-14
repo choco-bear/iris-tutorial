@@ -150,6 +150,18 @@ Proof.
     done.
 Qed.
 
+Lemma state_valid' γ n m :
+  own γ (● MaxNat n) -∗
+  own γ (◯ MaxNat m) -∗
+  ⌜m ≤ n⌝.
+Proof.
+  iIntros "Hn Hm".
+  iPoseProof (own_valid_2 with "Hn Hm") as "%H".
+  iPureIntro.
+  apply auth_both_valid_discrete in H as [H _].
+  by apply max_nat_included in H.
+Qed.
+
 Lemma state_valid γ n m :
   own γ (● MaxNat n) -∗
   own γ (◯ MaxNat m) -∗
@@ -162,6 +174,16 @@ Proof.
   destruct H as [H _].
   apply max_nat_included in H; cbn in H.
   done.
+Qed.
+
+Lemma update_state' γ n :
+  own γ (● MaxNat n) ==∗
+  own γ (● MaxNat (S n)) ∗ own γ (◯ MaxNat (S n)).
+Proof.
+  rewrite <- own_op.
+  iIntros; iStopProof.
+  apply own_update, auth_update_alloc, max_nat_local_update.
+  simpl; lia.
 Qed.
 
 Lemma update_state γ n :
@@ -196,39 +218,73 @@ Qed.
 Lemma mk_counter_spec :
   {{{ True }}} mk_counter #() {{{ c γ, RET c; is_counter c γ 0}}}.
 Proof.
-  (* exercise *)
-Admitted.
+  iIntros "%Φ _ HΦ".
+  wp_lam.
+  wp_alloc l as "Hl".
+  iPoseProof alloc_initial_state as "> (%γ & Hγ & Hγ')".
+  iApply ("HΦ" $! _ γ).
+  iFrame.
+  iExists _; iSplitR; try done.
+  iMod (inv_alloc _ _ _ with "[Hl Hγ]"); last done.
+  iExists _.
+  iFrame.
+Qed.
 
 Lemma read_spec c γ n :
   {{{ is_counter c γ n }}} read c {{{ (u : nat), RET #u; ⌜n ≤ u⌝ }}}.
 Proof.
-  (* exercise *)
-Admitted.
+  rewrite /is_counter.
+  iIntros "%Φ (%l & -> & Hγf & #I) HΦ".
+  wp_lam.
+  iInv "I" as "(%m & Hl & Hγa)".
+  wp_load.
+  iCombine "Hγa Hγf" gives "%Hvalid".
+  apply auth_both_valid_discrete in Hvalid as [Hnm _].
+  apply max_nat_included in Hnm; simpl in Hnm.
+  iFrame.
+  by iApply "HΦ".
+Qed.
 
 Lemma incr_spec c γ n :
   {{{ is_counter c γ n }}}
     incr c
   {{{ (u : nat), RET #u; ⌜n ≤ u⌝ ∗ is_counter c γ (S n) }}}.
 Proof.
-  iIntros "%Φ (%l & -> & #Hγ' & #HI) HΦ".
+  iIntros "%Φ (%l & -> & #Hγ' & #I) HΦ".
   iLöb as "IH".
   wp_rec.
   wp_bind (! _)%E.
-  iInv "HI" as "(%m & Hl & Hγ)".
+  iInv "I" as "(%m & Hl & Hγ)".
   wp_load.
   iModIntro.
-  iSplitL "Hl Hγ".
-  { iExists m. iFrame. }
+  iSplitL "Hl Hγ"; first iFrame.
   wp_pures.
   wp_bind (CmpXchg _ _ _).
-  iInv "HI" as "(%m' & Hl & Hγ)".
+  iInv "I" as "(%m' & Hl & Hγ)".
   destruct (decide (#m = #m')) as [e | ne].
   - wp_cmpxchg_suc.
     injection e as e.
     apply (inj Z.of_nat) in e.
     subst m'.
-    (* exercise *)
-Admitted.
+    iCombine "Hγ Hγ'" gives "%H".
+    apply auth_both_valid_discrete in H as [Hnm _].
+    apply max_nat_included in Hnm; simpl in Hnm.
+    iPoseProof (update_state with "Hγ") as ">[Hγ Hγ'']".
+    assert (#(m + 1) = #(S m)) as ->;
+      first by rewrite Z.add_1_r Nat2Z.inj_succ.
+    iModIntro; iFrame.
+    wp_pures.
+    iApply "HΦ".
+    iFrame "% #".
+    iSplitR; first done.
+    iApply (own_mono with "Hγ''").
+    apply auth_frag_mono, max_nat_included; simpl; lia.
+  - wp_cmpxchg_fail.
+    iSplitL "Hl Hγ"; first by iFrame.
+    iModIntro.
+    wp_pures.
+    by iApply "IH".
+Qed.
 
 (* ================================================================= *)
 (** ** A Simple Counter Client *)
