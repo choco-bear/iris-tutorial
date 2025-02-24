@@ -49,8 +49,11 @@ CoFixpoint fun2stream (f : nat → nat) : stream :=
 
 Lemma fun2stream_nth (f : nat → nat) (n : nat) : nth (fun2stream f) n = f n.
 Proof.
-  (* exercise *)
-Admitted.
+  revert f.
+  induction n; first auto.
+  intros.
+  apply IHn.
+Qed.
 
 Section ofe.
 
@@ -86,9 +89,13 @@ Local Instance stream_dist_instance : Dist stream := λ n s1 s2,
 *)
 Lemma stream_ofe_mixin : OfeMixin stream.
 Proof.
-  split.
-  (* exercise *)
-Admitted.
+  repeat split.
+  - by intros H??.
+  - by intros H?; eapply H.
+  - by intros ?? H??; rewrite H.
+  - by intros ??? H1 H2??; rewrite H1; try rewrite H2.
+  - intros ???? H???; rewrite H; lia.
+Qed.
 
 (**
   We can now package this together into an OFE.
@@ -113,10 +120,7 @@ Global Program Instance stream_cofe : Cofe streamO := {|
 |}.
 Next Obligation.
   intros n [c Hc] i Hi; simpl.
-  rewrite fun2stream_nth.
-  specialize (Hc i n Hi i).
-  symmetry.
-  by apply Hc.
+  by rewrite fun2stream_nth (Hc i n Hi i).
 Qed.
 
 (**
@@ -135,11 +139,7 @@ Qed.
 Global Instance SCons_contractive x : Contractive (SCons x).
 Proof.
   intros n s1 s2 [H] i Hi.
-  destruct i as [|j].
-  - simpl.
-    done.
-  - simpl.
-    by apply (H j).
+  destruct i as [|j]; by try apply (H j).
 Qed.
 
 (**
@@ -211,8 +211,9 @@ Fixpoint sapp (l : list nat) (s : stream) : stream :=
 *)
 Global Instance sapp_ne (l : list nat) : NonExpansive (sapp l).
 Proof.
-  (* exercise *)
-Admitted.
+  induction l; first apply _.
+  by intros ????H%IHl%(SCons_ne a).
+Qed.
 
 Global Instance sapp_proper (l : list nat) : Proper ((≡) ==> (≡)) (sapp l).
 Proof. apply ne_proper, _. Qed.
@@ -263,13 +264,7 @@ Definition repeat_with_sep (l : list nat) (x : nat) :=
 Lemma repeat_with_sep_helper_unfold (l : list nat) (x : nat) (helper : list nat) :
   repeat_with_sep_helper l x helper ≡ sapp helper (SCons x (repeat_with_sep_helper l x l)).
 Proof.
-  induction helper as [|y helper IH].
-  - intros [|n]; simpl.
-    + done.
-    + done.
-  - intros [|n]; simpl.
-    + done.
-    + done.
+  by induction helper; intros []; simpl.
 Qed.
 
 Lemma repeat_with_sep_unfold (l : list nat) (x : nat) :
@@ -370,22 +365,21 @@ Proof. exact (fixpoint_unfold (stream_map_pre f) s). Qed.
 Lemma stream_map_alt_correct (f : nat → nat) (s : stream) : stream_map f s ≡ stream_map_alt f s.
 Proof.
   apply (fixpoint_unique (stream_map_pre f)).
-  clear s; intros s.
-  intros [|n]; simpl.
-  + done.
-  + done.
+  by intros ?[].
 Qed.
 
 Lemma stream_map_nth (f : nat → nat) (s : stream) (n : nat) :
   nth (stream_map f s) n = f (nth s n).
 Proof.
-  (* exercise *)
-Admitted.
+  revert s.
+  induction n; by simpl.
+Qed.
 
 Global Instance stream_map_ne (f : nat → nat) : NonExpansive (stream_map f).
 Proof.
-  (* exercise *)
-Admitted.
+  intros ??? H? Hle.
+  by rewrite !stream_map_nth (H i Hle).
+Qed.
 
 (**
   If we now wanted to create a stream of all the powers of 2, we would
@@ -415,8 +409,11 @@ Definition power2 : stream :=
 Lemma power2_helper_unfold (n : nat) :
   power2_helper n ≡ SCons n (stream_map (λ n, n * 2) (power2_helper n)).
 Proof.
-  (* exercise *)
-Admitted.
+  intro m; revert n.
+  induction m; first done.
+  intro; simpl; rewrite IHm.
+  by destruct m.
+Qed.
 
 Lemma power2_unfold :
   power2 ≡ SCons 1 (stream_map (λ n, n * 2) power2).
